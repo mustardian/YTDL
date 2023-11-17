@@ -1,5 +1,4 @@
 import 'dart:collection';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -89,7 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         ClipboardData? data =
-                            await Clipboard.getData('text/plain');
+                        await Clipboard.getData('text/plain');
                         if (data != null) {
                           textEditingController.text = data.text!;
                         }
@@ -102,6 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     height: 60,
                     child: ElevatedButton(
                       onPressed: () async {
+                        checkAndRequestPermissions();
                         if (textEditingController.text.contains("playlist")) {
                           await downloadPlaylistAsMp3(
                               textEditingController.text);
@@ -165,6 +165,10 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     } else if (status == DownloadTaskStatus.failed) {
       // Handle download failure
+      print(status);
+      setState(() {
+        tasks.removeWhere((task) => task.taskId == id);
+      });
       print("Download failed for task ID: $id");
     } else if (status == DownloadTaskStatus.canceled) {
       // Handle download cancellation
@@ -265,13 +269,34 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> checkAndRequestPermissions() async {
-    var storageStatus = await Permission.storage.status;
-    if (!storageStatus.isGranted) {
-      await Permission.storage.request();
-    }
-    var notificationStatus = await Permission.notification.status;
-    if (!notificationStatus.isGranted) {
-      await Permission.notification.request();
+    try {
+      var storageStatus = await Permission.manageExternalStorage.status;
+
+      if (!storageStatus.isGranted) {
+        var storageResult = await Permission.manageExternalStorage.request();
+
+        if (storageResult != PermissionStatus.granted) {
+          await Permission.manageExternalStorage.request();
+          print("Storage permission denied or restricted");
+        }
+      }
+
+      var notificationStatus = await Permission.notification.status;
+
+      if (!notificationStatus.isGranted) {
+        var notificationResult = await Permission.notification.request();
+
+        if (notificationResult != PermissionStatus.granted) {
+          // Handle denied or restricted notification permission
+          print("Notification permission denied or restricted");
+        }
+      }
+
+      print("Storage Permission Granted: ${storageStatus.isGranted}");
+      print("Notification Permission Granted: ${notificationStatus.isGranted}");
+
+    } catch (e) {
+      print("Error checking or requesting permissions: $e");
     }
   }
 }
