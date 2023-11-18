@@ -276,7 +276,10 @@ class _MyHomePageState extends State<MyHomePage> {
         var storageResult = await Permission.manageExternalStorage.request();
 
         if (storageResult != PermissionStatus.granted) {
-          await Permission.manageExternalStorage.request();
+          Map<Permission, PermissionStatus> statuses = await [
+            Permission.storage,
+            Permission.manageExternalStorage,
+          ].request();
           print("Storage permission denied or restricted");
         }
       }
