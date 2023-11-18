@@ -1,4 +1,6 @@
 import 'dart:collection';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -20,10 +22,41 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'YTDL',
-      theme: ThemeData(
+      theme: ThemeData.light().copyWith(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData.dark().copyWith(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        appBarTheme: AppBarTheme(
+          color: Colors.black,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 22
+          )
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          fillColor: Colors.black
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white
+          )
+        ),
+        textTheme: TextTheme(
+          bodyLarge: TextStyle(
+            color: Colors.white
+          )
+        ),
+        listTileTheme: ListTileThemeData(
+          titleTextStyle: TextStyle(
+            color: Colors.white
+          ),
+        )
+      ),
+      themeMode: ThemeMode.system,
       home: const MyHomePage(),
     );
   }
@@ -58,6 +91,34 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     checkAndRequestPermissions();
     FlutterDownloader.registerCallback(downloadCallback);
+  }
+  @pragma('vm:entry-point')
+  void downloadCallback(String id, int status, int progress) {
+    print("BOOM");
+    print(status);
+    if (status == DownloadTaskStatus.complete) {
+      // Download with task ID 'id' is complete
+      // You can perform any actions needed when a download is complete
+      // For example, start the next download if there are more tasks
+      // startNextDownload();
+      setState(() {
+        tasks.removeWhere((task) => task.taskId == id);
+      });
+      print(tasks);
+    } else if (status == DownloadTaskStatus.failed) {
+      // Handle download failure
+      print("HERE");
+      print(status);
+      setState(() {
+        tasks.removeWhere((task) => task.taskId == id);
+      });
+      print("Download failed for task ID: $id");
+    } else if (status == DownloadTaskStatus.canceled) {
+      // Handle download cancellation
+      print("Download canceled for task ID: $id");
+    }
+    // Update the progress for the ongoing downloads
+    // updateDownloadProgress(id, progress);
   }
 
   @override
@@ -109,7 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           await downloadVideoAsMp3(textEditingController.text);
                         }
                       },
-                      child: const Text("Search"),
+                      child: const Text("Download"),
                     ),
                   ),
                 ],
@@ -142,7 +203,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     title: Text(task.title),
                     trailing: IconButton(
                       onPressed: () => cancelDownload(task.taskId),
-                      icon: const Icon(Icons.clear),
+                      icon: Icon(Icons.clear, color: Theme.of(context).iconTheme.color,),
                     ),
                   );
                 },
@@ -154,36 +215,13 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void downloadCallback(String id, int status, int progress) {
-    if (status == DownloadTaskStatus.complete) {
-      // Download with task ID 'id' is complete
-      // You can perform any actions needed when a download is complete
-      // For example, start the next download if there are more tasks
-      startNextDownload();
-      setState(() {
-        tasks.removeWhere((task) => task.taskId == id);
-      });
-    } else if (status == DownloadTaskStatus.failed) {
-      // Handle download failure
-      print(status);
-      setState(() {
-        tasks.removeWhere((task) => task.taskId == id);
-      });
-      print("Download failed for task ID: $id");
-    } else if (status == DownloadTaskStatus.canceled) {
-      // Handle download cancellation
-      print("Download canceled for task ID: $id");
-    }
-    // Update the progress for the ongoing downloads
-    // updateDownloadProgress(id, progress);
-  }
 
   Future<void> startNextDownload() async {
     // Check if there are more tasks in the queue
-    if (tasksQueue.isNotEmpty) {
-      var nextTask = tasksQueue.removeFirst();
-      // await downloadAudio(nextTask.url, nextTask.title);
-    }
+    // if (tasksQueue.isNotEmpty) {
+    //   var nextTask = tasksQueue.removeFirst();
+    //   // await downloadAudio(nextTask.url, nextTask.title);
+    // }
   }
 
   Future<void> downloadVideoAsMp3(String videoUrl) async {
@@ -270,17 +308,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> checkAndRequestPermissions() async {
     try {
-      var storageStatus = await Permission.manageExternalStorage.status;
+      PermissionStatus status;
+      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+
+      var storageStatus = await Permission.storage.status;
+
 
       if (!storageStatus.isGranted) {
-        var storageResult = await Permission.manageExternalStorage.request();
-
-        if (storageResult != PermissionStatus.granted) {
-          Map<Permission, PermissionStatus> statuses = await [
-            Permission.storage,
-            Permission.manageExternalStorage,
-          ].request();
-          print("Storage permission denied or restricted");
+        if ((androidInfo.version.sdkInt) >= 33) {
+          status = await Permission.manageExternalStorage.request();
+        } else {
+          status = await Permission.storage.request();
         }
       }
 
